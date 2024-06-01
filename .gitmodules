@@ -1,0 +1,9 @@
+[submodule "LibRaw"]
+	path = LibRaw
+	url = https://github.com/LibRaw/LibRaw.git
+[submodule "LibRaw-cmake"]
+	path = LibRaw-cmake
+	url = https://github.com/LibRaw/LibRaw-cmake.git
+[submodule "exiftool"]
+	path = exiftool
+	url = https://github.com/exiftool/exiftool.git
