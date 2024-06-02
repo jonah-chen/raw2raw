@@ -63,14 +63,16 @@ ParserErrors parse_image(const char *filename,
 }
 
 /* Note: we are assuming width and height are correct. */
-ParserErrors write_image(const char *ref_file,
-                         const char *out_file,
+ParserErrors write_image(const std::filesystem::path &ref_file,
+                         const std::filesystem::path &out_file,
                          const u16 *output_data,
                          const u16 *raw_data,
                          size_t width,
                          size_t height)
 {
-    size_t img_size = width * height * sizeof(u16);
+    // this has to be signed since we will be subtracting them later
+    long img_size = static_cast<long>(width * height * sizeof(u16));
+
     // Open reference file and read its bytes
     std::ifstream ref(ref_file, std::ios::binary);
     if (!ref.is_open()) {
@@ -80,7 +82,7 @@ ParserErrors write_image(const char *ref_file,
     // read the bytes into a buffer
     // first find the size of ref
     ref.seekg(0, std::ios::end);
-    size_t ref_size = ref.tellg();
+    long ref_size = static_cast<long>(ref.tellg());
     ref.seekg(0, std::ios::beg);
     char *ref_bytes = new char[ref_size];
     ref.read(ref_bytes, ref_size);
@@ -92,14 +94,14 @@ ParserErrors write_image(const char *ref_file,
     to_little_endian_16(raw_data, raw_bytes, width * height);
 
     // find the offset of raw_data in ref_data
-    size_t offset = -1ul;
-    for (size_t i = 0; i < ref_size - img_size; i++) {
+    long offset = -1;
+    for (long i = 0; i < ref_size - img_size; i++) {
         if (memcmp(ref_bytes + i, raw_bytes, img_size) == 0) {
             offset = i;
             break;
         }
     }
-    if (offset == -1ul) {
+    if (offset == -1) {
         delete[] ref_bytes;
         delete[] raw_bytes;
         return ParserErrors::MAY_BE_COMPRESSED;
@@ -107,7 +109,7 @@ ParserErrors write_image(const char *ref_file,
 
     // write the output data *RawProcessor.imgdata.rawdata.raw_image
     // overwrite the ref bytes with the output data bytes
-    to_little_endian_16(output_data, ref_bytes + offset, width * height); 
+    to_little_endian_16(output_data, ref_bytes + offset, width * height);
 
     // write the updated ref bytes to out_file
     std::ofstream out(out_file, std::ios::binary);
@@ -124,15 +126,15 @@ ParserErrors write_image(const char *ref_file,
 Task::Task(const std::vector<std::filesystem::path> &files)
     : n_images(files.size())
 {   
-    get_dimensions(files[0].c_str(), width, height);
+    get_dimensions(files[0].string().c_str(), width, height);
     wh = width * height; whn = wh * n_images;
     data = new u16[whn];
     
     std::vector<ParserErrors> errs(n_images);
     // parse each image in parallel
-    #pragma omp parallel for
+    #pragma omp parallel for default(none) shared(errs, files)
     for (size_t i = 0; i < n_images; i++) {
-        errs[i] = parse_image(files[i].c_str(), 
+        errs[i] = parse_image(files[i].string().c_str(),
             data + (i * wh), width, height);
     }
     for (ParserErrors e : errs) {

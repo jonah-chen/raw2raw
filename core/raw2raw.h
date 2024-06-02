@@ -41,8 +41,8 @@ ParserErrors parse_image(const char *filename,
  * Note that only uncompressed files are supported at the moment. Compressed
  * raw will require some reverse engineering of the compression algorithm.
  */
-ParserErrors write_image(const char *ref_file,
-                         const char *out_file,
+ParserErrors write_image(const std::filesystem::path &ref_file,
+                         const std::filesystem::path &out_file,
                          const io_t *output_data,
                          const io_t *raw_data,
                          size_t width,

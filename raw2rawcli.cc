@@ -73,6 +73,14 @@ int main(int argc, char *argv[])
             ans = r2r::p_minimum(task);
         } else if (algorithm == "range") {
             ans = r2r::p_range(task);
+        } else {
+            std::cout << algorithm << " is not a valid algorithm. Only the following [ ";
+            for (const auto &algo : reduction_algos) {
+                std::cout << algo << " ";
+            }
+            std::cout << " ] algorithms are currently supported. If you would like to suggest another algorithm, feel"
+                << " free to raise an issue on https://github.com/jonah-chen/raw2raw.\n";
+            return 1;
         }
         std::cout << "Computing the " << algorithm << " took " << 
             std::setprecision(5) << timer.stop() << "ms\n\n" << 
@@ -87,10 +95,11 @@ int main(int argc, char *argv[])
         }
         std::cout << "------------------------------------------\n\n";
 
-        if (r2r::write_image(files[0].c_str(), output_path.c_str(), ans, task.data, task.width, task.height) == r2r::ParserErrors::PARSE_SUCCESS) {
+        auto e = r2r::write_image(files[0], output_path, ans, task.data, task.width, task.height);
+        if (e == r2r::ParserErrors::PARSE_SUCCESS) {
             std::cout <<  "Output written to " << output_path << "\n";
         } else {
-            std::cout << "Failed to write the output\n";
+            std::cout << "Failed to write the output due to " << (int)e << ".\n";
             delete[] ans;
             return 1;
         }
