@@ -1,3 +1,15 @@
+/**
+ * Raw2Raw
+ * core/reduce_extra.cc
+ * Author: Jonah Chen
+ * Last updated in rev 0.1
+ *
+ * This file contains the implementation of the extra reduction algorithms that are not included in the main library
+ * yet.
+ *
+ * This project is licensed under the GPL v3.0 license. Please see the LICENSE file for more information.
+ */
+
 #include "raw2raw.h"
 #include <algorithm>
 

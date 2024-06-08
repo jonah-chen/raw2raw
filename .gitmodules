@@ -7,3 +7,13 @@
 [submodule "exiftool"]
 	path = exiftool
 	url = https://github.com/exiftool/exiftool.git
+[submodule "frontend/imgui"]
+	path = frontend/imgui
+	url = https://github.com/ocornut/imgui.git
+	branch = docking
+[submodule "frontend/glfw"]
+    path = frontend/glfw
+    url = https://github.com/glfw/glfw.git
+[submodule "stb"]
+	path = stb
+	url = https://github.com/nothings/stb

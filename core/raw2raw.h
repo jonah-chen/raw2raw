@@ -1,7 +1,19 @@
+/**
+ * Raw2Raw
+ * core/raw2raw.h
+ * Author: Jonah Chen
+ * Last updated in rev 0.1
+ *
+ * This file outlines the core functionality of the raw2raw library, which is used to process raw images into other
+ * raw images. This is the API of the library that is exposed, and contains the main types and functions that are used
+ * in the library.
+ *
+ * This project is licensed under the GPL v3.0 license. Please see the LICENSE file for more information.
+ */
 #pragma once
+#include <cstdint>
 #include <vector>
 #include <filesystem>
-#include <chrono>
 
 namespace r2r {
 
@@ -25,11 +37,13 @@ enum class ParserErrors {
     MAY_BE_COMPRESSED
 };
 
+bool recognized_raw(std::filesystem::path fp);
+
 ParserErrors get_dimensions (const char *filename, size_t &width, size_t &height);
 
 /* Parse a raw file using libraw, and return the raw data (as u16)
  */
-ParserErrors parse_image(const char *filename, 
+ParserErrors parse_image(const char *filename,
                          io_t *output,
                          size_t width,
                          size_t height);
@@ -51,6 +65,7 @@ ParserErrors write_image(const std::filesystem::path &ref_file,
 template<typename I, typename O>
 void array_cast(const I *input, O *output, size_t count)
 {
+    #pragma omp parallel for default(none) shared(input, output, count) schedule(static)
     for (size_t i = 0; i < count; i++) {
         output[i] = (O)input[i];
     }
@@ -63,9 +78,9 @@ struct Timer
 {
     Timer(bool _start = true);
     void start();
-    float stop();
+    double stop();
 private:
-    std::chrono::time_point<std::chrono::high_resolution_clock> start_;
+    double start_;
 };
 
 /* A task that holds a set of images to be processed together in a 
@@ -79,16 +94,34 @@ struct Task {
     Task(const std::vector<std::filesystem::path> &files);
     ~Task();
     io_t *data;
+    u32 max_val;
     size_t width, height, n_images;
     size_t wh, whn;
 };
+
+enum class pReduction {
+    NONE = 0,
+    MEAN,
+    MEDIAN,
+    SUMMATION,
+    MAXIMUM,
+    MINIMUM,
+    RANGE,
+    VARIANCE,
+    STANDARD_DEVIATION,
+    SKEWNESS,
+    KURTOSIS,
+    ENTROPY
+};
+
+io_t *p_reduce(const Task &task, pReduction reduction);
 
 /* pixel-wise reduction functions (avail in photoshop stack modes)
  * but unlike photoshop, these functions can be done raw 
  */
 io_t *p_mean(const Task &task);
 io_t *p_median(const Task &task);
-io_t *p_summation(const Task &task, int bits = 14);
+io_t *p_summation(const Task &task);
 io_t *p_maximum(const Task &task);
 io_t *p_minimum(const Task &task);
 io_t *p_range(const Task &task);
@@ -96,6 +129,8 @@ io_t *p_range(const Task &task);
  * compared with the input */
 io_t *p_variance(const Task &task);
 io_t *p_standard_deviation(const Task &task);
+
+/** TODO: Implement all of these, and more
 io_t *p_skewness(const Task &task);
 io_t *p_kurtosis(const Task &task);
 io_t *p_entropy(const Task &task);
@@ -108,4 +143,6 @@ io_t *p_mean_remove_outlier(Task &task, int outliers);
 // whole-image analysis functions
 std::vector<double> noise(const Task &task); 
 // TODO: a general renormalize function taking many parameters
-}
+*/
+
+} // namespace r2r

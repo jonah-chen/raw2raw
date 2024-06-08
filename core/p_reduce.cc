@@ -1,6 +1,17 @@
+/**
+ * Raw2Raw
+ * core/reduce.cc
+ * Author: Jonah Chen
+ * Last updated in rev 0.1
+ *
+ * This file contains the implementation of the pixel-wise reduction algorithms. These algorithms are used to reduce the
+ * number of images in a stack of images to a single image. The algorithms are implemented using OpenMP to parallelize
+ * the computation.
+ *
+ * This project is licensed under the GPL v3.0 license. Please see the LICENSE file for more information.
+ */
 #include "raw2raw.h"
 #include <algorithm>
-#include <numeric>
 #include <cmath>
 
 namespace r2r {
@@ -48,11 +59,11 @@ io_t *p_median(const Task &task)
     return ans;
 }
 
-io_t *p_summation(const Task &task, int bits)
+io_t *p_summation(const Task &task)
 {
-    interm_t limit = (1u<<bits) - 1;
+    interm_t limit = task.max_val;
     io_t *ans = new io_t[task.wh];
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for default(none) shared(task, ans, limit) schedule(static)
     for (int i = 0; i < task.wh; i++) {
         interm_t s = 0;
         for (int j = 0; j < task.n_images; j++) {
@@ -66,13 +77,13 @@ io_t *p_summation(const Task &task, int bits)
 io_t *p_maximum(const Task &task)
 {
     io_t *ans = new io_t[task.wh];
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for default(none) shared(task, ans) schedule(static)
     for (int i = 0; i < task.wh; i++) {
-        io_t m = 0;
+        io_t M = 0;
         for (int j = 0; j < task.n_images; j++) {
-            m = std::max(m, task.data[j * task.wh + i]);
+            M = std::max(M, task.data[j * task.wh + i]);
         }
-        ans[i] = m;
+        ans[i] = M;
     }
     return ans;
 }
@@ -80,7 +91,7 @@ io_t *p_maximum(const Task &task)
 io_t *p_minimum(const Task &task)
 {
     io_t *ans = new io_t[task.wh];
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for default(none) shared(task, ans) schedule(static)
     for (int i = 0; i < task.wh; i++) {
         io_t m = 0xffff;
         for (int j = 0; j < task.n_images; j++) {
@@ -94,9 +105,9 @@ io_t *p_minimum(const Task &task)
 io_t *p_range(const Task &task)
 {
     io_t *ans = new io_t[task.wh];
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for default(none) shared(task, ans) schedule(static)
     for (int i = 0; i < task.wh; i++) {
-        io_t m = 0, M = 0;
+        io_t m = 0xffff, M = 0;
         for (int j = 0; j < task.n_images; j++) {
             m = std::min(m, task.data[j * task.wh + i]);
             M = std::max(M, task.data[j * task.wh + i]);
@@ -110,14 +121,14 @@ io_t *p_variance(const Task &task)
 {
     io_t *mean = p_mean(task);
     io_t *ans = new io_t[task.wh];
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for default(none) shared(task, mean, ans) schedule(static)
     for (int i = 0; i < task.wh; i++) {
         interm_t s = 0;
         for (int j = 0; j < task.n_images; j++) {
             auto delta = task.data[j * task.wh + i] - mean[i];
             s += delta * delta;
         }
-        ans[i] = s / (task.n_images - 1);
+        ans[i] = std::min<interm_t>(s / (task.n_images - 1), task.max_val);
     }
     delete[] mean;
     return ans;
@@ -125,14 +136,44 @@ io_t *p_variance(const Task &task)
 
 io_t *p_standard_deviation(const Task &task)
 {
-    io_t *var = p_variance(task);
+    io_t *mean = p_mean(task);
     io_t *ans = new io_t[task.wh];
-    #pragma omp parallel for schedule(static)
+    #pragma omp parallel for default(none) shared(task, mean, ans) schedule(static)
     for (int i = 0; i < task.wh; i++) {
-        ans[i] = std::sqrt(var[i]);
+        interm_t s = 0;
+        for (int j = 0; j < task.n_images; j++) {
+            auto delta = task.data[j * task.wh + i] - mean[i];
+            s += delta * delta;
+        }
+        ans[i] = std::min<interm_t>((interm_t)std::sqrt(s / (task.n_images - 1)), task.max_val);
     }
-    delete[] var;
+    delete[] mean;
     return ans;
 }
 
+
+io_t *p_reduce(const Task &task, pReduction reduction)
+{
+    switch (reduction) {
+        case pReduction::MEAN:
+            return p_mean(task);
+        case pReduction::MEDIAN:
+            return p_median(task);
+        case pReduction::SUMMATION:
+            return p_summation(task);
+        case pReduction::MAXIMUM:
+            return p_maximum(task);
+        case pReduction::MINIMUM:
+            return p_minimum(task);
+        case pReduction::RANGE:
+            return p_range(task);
+        case pReduction::VARIANCE:
+            return p_variance(task);
+        case pReduction::STANDARD_DEVIATION:
+            return p_standard_deviation(task);
+        default:
+            return nullptr;
+    }
 }
+
+} // namespace r2r

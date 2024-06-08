@@ -1,6 +1,24 @@
+/**
+ * Raw2Raw
+ * core/parse.cc
+ * Author: Jonah Chen
+ * Last updated in rev 0.1
+ *
+ * This file contains the implementation of the raw2raw parser, which is used to parse raw images into a format that can
+ * be used by the various algorithm that is implemented or planned for the future. It contains the functions that can
+ * read and write raw files. Currently, only uncompressed raw files are supported.
+ *
+ * We are mostly using LibRaw library at the moment to parse the raw file formats. It can also parse metadata also,
+ * which we will take advantage of in the future.
+ *
+ * It will take some reverse engineering to figure out the compression algorithms in order to support compressed raw files.
+ *
+ * This project is licensed under the GPL v3.0 license. Please see the LICENSE file for more information.
+ */
+
 #include "raw2raw.h"
 #include "libraw/libraw.h"
-#include <omp.h>
+#include <algorithm>
 
 namespace {
 template<typename T>
@@ -16,10 +34,17 @@ void to_little_endian_16(const T *input, char *output, size_t count)
     }
 }
 
-}
+} // anonymous namespace
 
 namespace r2r {
-ParserErrors get_dimensions (const char *filename, size_t &width, size_t &height)
+bool recognized_raw(std::filesystem::path fp)
+{
+    auto ext = fp.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+    return ext == ".cr2" || ext == ".cr3" || ext == ".nef" || ext == ".arw";
+}
+
+ParserErrors get_dimensions (const char *filename, size_t &width, size_t &height, u32 &data_max)
 {
     LibRaw RawProcessor;
     if (RawProcessor.open_file(filename) != LIBRAW_SUCCESS) {
@@ -28,11 +53,12 @@ ParserErrors get_dimensions (const char *filename, size_t &width, size_t &height
     }
     width = RawProcessor.imgdata.sizes.raw_width;
     height = RawProcessor.imgdata.sizes.raw_height;
+    data_max = RawProcessor.imgdata.color.maximum;
     RawProcessor.recycle();
     return ParserErrors::PARSE_SUCCESS;
 }
 
-ParserErrors parse_image(const char *filename, 
+ParserErrors parse_image(const char *filename,
                  io_t *output,
                  size_t width,
                  size_t height)
@@ -126,7 +152,7 @@ ParserErrors write_image(const std::filesystem::path &ref_file,
 Task::Task(const std::vector<std::filesystem::path> &files)
     : n_images(files.size())
 {   
-    get_dimensions(files[0].string().c_str(), width, height);
+    get_dimensions(files[0].string().c_str(), width, height, max_val);
     wh = width * height; whn = wh * n_images;
     data = new u16[whn];
     
@@ -153,4 +179,4 @@ Task::~Task()
     delete[] data;
 }
 
-}
+} // namespace r2r
